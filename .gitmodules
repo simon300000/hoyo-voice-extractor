@@ -1,0 +1,6 @@
+[submodule "Wwise-Unpacker"]
+	path = Wwise-Unpacker
+	url = https://github.com/simon300000/Wwise-Unpacker.git
+[submodule "fnvjs"]
+	path = fnvjs
+	url = https://github.com/simon300000/fnvjs.git
