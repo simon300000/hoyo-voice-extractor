@@ -50,5 +50,6 @@ export const unpack = () => new Promise<void>((resolve, reject) => {
 export const exportFiles = async (folder: string) => {
   await rename(WAV_PATH, join(folder, 'wav'))
   await rename(WEM_PATH, join(folder, 'wem'))
+  console.log(`Exported files to ${folder}.`)
 }
 
