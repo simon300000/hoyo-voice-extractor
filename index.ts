@@ -12,6 +12,17 @@ export const PCK_DESTINATION = join(UNPACKER_PATH, 'Game_Files')
 
 const random = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
 
+export const checkResultFolder = async (folder: string) => {
+  const files = await readdir(folder)
+  const no = ['wav', 'wem']
+  if (no.some(f => files.includes(f))) {
+    console.log('Result folder already exists.')
+    console.log(`Please remove the following files/folders from ${folder}:`)
+    console.log(no.join('\n'))
+    process.exit(1)
+  }
+}
+
 const movePCK = async (folder: string) => {
   let i = 0
   console.log(`Reading ${folder}...`)
