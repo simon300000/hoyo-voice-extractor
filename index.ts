@@ -1,4 +1,4 @@
-import { readdir, stat, rename } from 'fs/promises'
+import { readdir, stat, rename, unlink } from 'fs/promises'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
 
@@ -35,6 +35,18 @@ const movePCK = async (folder: string) => {
 export const importPCK = async (folder: string) => {
   const i = await movePCK(folder)
   console.log(`Moved ${i} files.`)
+}
+
+export const cleanPCK = async () => {
+  let i = 0
+  const files = await readdir(PCK_DESTINATION)
+  for (const file of files) {
+    if (extname(file) === '.pck') {
+      i++
+      await unlink(join(PCK_DESTINATION, file))
+    }
+  }
+  console.log(`Removed ${i} files.`)
 }
 
 export const unpack = () => new Promise<void>((resolve, reject) => {
