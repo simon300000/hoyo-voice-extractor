@@ -2,6 +2,8 @@ import { readdir, stat, rename } from 'fs/promises'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
 
+import { fnv1 } from './fnvjs/src/index.js'
+
 const UNPACKER_PATH = join(import.meta.dirname, 'Wwise-Unpacker')
 const UNPACKER = join(UNPACKER_PATH, 'unpack_wav.bat')
 const WAV_PATH = join(UNPACKER_PATH, 'dest_wav')
@@ -53,3 +55,5 @@ export const exportFiles = async (folder: string) => {
   console.log(`Exported files to ${folder}.`)
 }
 
+
+export const encodeFNV64 = (input: string) => fnv1(input.toLowerCase(), 64).toString(16).padStart(16, '0')
