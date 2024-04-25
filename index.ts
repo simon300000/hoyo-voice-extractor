@@ -1,5 +1,5 @@
 import { readdir, stat, mkdir } from 'fs/promises'
-import { join, extname } from 'path'
+import { join, extname, dirname } from 'path'
 
 import { fnv1 } from './fnvjs/src/index.js'
 
@@ -43,17 +43,26 @@ export const unpack = async (source: string, wemFolder: string, wavFolder: strin
   const pcks = await findFiles(source, '.pck')
   console.log(`Found ${pcks.length} pck files.`)
   console.log('Unpacking...')
+  const wavCreatedFolders = new Set<string>()
   await parallelExecute(pcks.map(pck => async () => {
     const name = random()
     const wem = join(wemFolder, name)
     const wav = join(wavFolder, name)
     await mkdir(wem)
     await mkdir(wav)
+    wavCreatedFolders.add(wav)
     await unpackPCK(pck, wem)
   }))
   const wems = await findFiles(wemFolder, '.wem')
   console.log(`Found ${wems.length} wem files.`)
   console.log('Converting...')
+  for (const wem of wems) {
+    const folder = dirname(wem).replace(wemFolder, wavFolder)
+    if (!wavCreatedFolders.has(folder)) {
+      await mkdir(folder, { recursive: true })
+      wavCreatedFolders.add(folder)
+    }
+  }
   await parallelExecute(wems.map(wem => async () => {
     const wavPath = wem.replace(wemFolder, wavFolder).replace('.wem', '.wav')
     await convertWEM(wem, wavPath)
