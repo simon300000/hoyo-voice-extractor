@@ -37,7 +37,18 @@ export const findFiles = async (folder: string, ext: string) => {
   return [...result, ...(await Promise.all(resultPromise)).flat()]
 }
 
-export const unpack = async (source: string, wemFolder: string, wavFolder: string) => {
+export const createFolders = async (files: string[], existing = new Set<string>()) => {
+  const folders = new Set<string>(existing)
+  for (const file of files) {
+    const folder = dirname(file)
+    if (!folders.has(folder)) {
+      await mkdir(folder, { recursive: true })
+      folders.add(folder)
+    }
+  }
+}
+
+export const unpackPCKs = async (source: string, wemFolder: string, wavFolder: string) => {
   await mkdir(wemFolder, { recursive: true })
   await mkdir(wavFolder, { recursive: true })
   const pcks = await findFiles(source, '.pck')
@@ -56,13 +67,7 @@ export const unpack = async (source: string, wemFolder: string, wavFolder: strin
   const wems = await findFiles(wemFolder, '.wem')
   console.log(`Found ${wems.length} wem files.`)
   console.log('Converting...')
-  for (const wem of wems) {
-    const folder = dirname(wem).replace(wemFolder, wavFolder)
-    if (!wavCreatedFolders.has(folder)) {
-      await mkdir(folder, { recursive: true })
-      wavCreatedFolders.add(folder)
-    }
-  }
+  await createFolders(wems.map(wem => wem.replace(wemFolder, wavFolder)), wavCreatedFolders)
   await parallelExecute(wems.map(wem => async () => {
     const wavPath = wem.replace(wemFolder, wavFolder).replace('.wem', '.wav')
     await convertWEM(wem, wavPath)
