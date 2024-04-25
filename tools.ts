@@ -1,5 +1,5 @@
 import { cpus } from 'os'
-import { join } from 'path'
+import { join, dirname } from 'path'
 import { spawn } from 'child_process'
 
 const UNPACKER_PATH = join(import.meta.dirname, 'Wwise-Unpacker')
@@ -7,6 +7,7 @@ const TOOLS_PATH = join(UNPACKER_PATH, 'Tools')
 const QUICKBMS = join(TOOLS_PATH, 'quickbms.exe')
 const WWISE_PCK_EXTRACTOR = join(TOOLS_PATH, 'wwise_pck_extractor.bms')
 const VGMSTREAM_CLI = join(TOOLS_PATH, 'vgmstream-cli.exe')
+const BNKEXTR = join(TOOLS_PATH, 'bnkextr.exe')
 
 export const parallelExecute = async (tasks: (() => Promise<void>)[], multiplier = 2) => {
   const cpusCount = cpus().length * multiplier
@@ -27,8 +28,8 @@ export const parallelExecute = async (tasks: (() => Promise<void>)[], multiplier
   await Promise.all(workers)
 }
 
-const execute = (command: string, args: string[]) => new Promise<void>((resolve, reject) => {
-  const process = spawn(command, args)
+const execute = (command: string, args: string[], cwd?: string) => new Promise<void>((resolve, reject) => {
+  const process = spawn(command, args, { cwd })
   let stdout = ''
   let stderr = ''
   process.stdout.on('data', data => stdout += data)
@@ -45,3 +46,5 @@ const execute = (command: string, args: string[]) => new Promise<void>((resolve,
 export const unpackPCK = async (pck: string, output: string) => execute(QUICKBMS, ['-q', '-k', WWISE_PCK_EXTRACTOR, pck, output])
 
 export const convertWEM = async (wem: string, wav: string) => execute(VGMSTREAM_CLI, ['-o', wav, wem])
+
+export const unpackBNK = async (bnk: string, output: string) => execute(BNKEXTR, [bnk], output)
