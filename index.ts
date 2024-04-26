@@ -1,7 +1,7 @@
-import { readdir, stat, mkdir, rename, readFile } from 'fs/promises'
+import { readdir, stat, mkdir, rename, readFile, writeFile } from 'fs/promises'
 import { join, extname, dirname } from 'path'
 
-import { fnv1} from './fnvjs/src/index.js'
+import { fnv1 } from './fnvjs/src/index.js'
 
 import { parallelExecute, unpackPCK, convertWEM, unpackBNK } from './tools.js'
 
@@ -110,4 +110,58 @@ export const unpackBNKs = async (source: string, wemFolder: string, wavFolder: s
 
 export const encodeFNV64 = (input: string) => fnv1(input.toLowerCase(), 64).toString(16).padStart(16, '0')
 
-export type TextMap = Record<string, string>
+export const readTextMap = async <TextMapMap extends Record<string, string>>(dataPath: string, textMapMap: TextMapMap) => {
+  return Object.fromEntries(await Promise.all(Object.entries(textMapMap).map(async ([language, filename]) => [language, await readJSON(join(dataPath, 'TextMap', filename))]))) as Record<keyof TextMapMap, TextMap>
+}
+
+export const updateStats = async <Voice extends VoiceBase>(voiceMap: Record<string, Voice>, readme: string) => {
+  const currentDate = new Date().toISOString().replace(/T.*/, '')
+
+  let noSpeaker = 0
+  let noText = 0
+  let noFileName = 0
+
+  for (const voice of Object.values(voiceMap)) {
+    if (!voice.speaker) {
+      noSpeaker++
+    }
+    if (!voice.transcription) {
+      noText++
+    }
+    if (!voice.inGameFilename) {
+      noFileName++
+    }
+  }
+
+  const stats = `<!-- STATS -->
+Last update at \`${currentDate}\`
+
+\`${Object.keys(voiceMap).length}\` wavs
+
+\`${noSpeaker}\` without speaker
+
+\`${noText}\` without transcription
+
+\`${noFileName}\` without inGameFilename
+<!-- STATS_END -->`
+
+  console.log(stats)
+
+  const originalReadme = await readFile(readme, 'utf-8')
+  const updatedReadme = originalReadme.replace(/<!-- STATS -->[\s\S]*<!-- STATS_END -->/, stats)
+  await writeFile('readme.md', updatedReadme)
+}
+
+export const copyReadme = async (source: string, destination: string, huggingfaceMetadata: string) => {
+  const readme = await readFile(source, 'utf-8')
+  await writeFile(destination, `${huggingfaceMetadata}\n\n${readme}`)
+}
+
+type TextMap = Record<string, string>
+
+type VoiceBase = {
+  inGameFilename: string
+  language: string
+  transcription: string
+  speaker: string
+}
