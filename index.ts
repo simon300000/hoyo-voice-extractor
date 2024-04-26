@@ -1,7 +1,7 @@
 import { readdir, stat, mkdir, rename, readFile } from 'fs/promises'
 import { join, extname, dirname } from 'path'
 
-import { fnv1, fnv132 } from './fnvjs/src/index.js'
+import { fnv1} from './fnvjs/src/index.js'
 
 import { parallelExecute, unpackPCK, convertWEM, unpackBNK } from './tools.js'
 
@@ -109,3 +109,5 @@ export const unpackBNKs = async (source: string, wemFolder: string, wavFolder: s
 }
 
 export const encodeFNV64 = (input: string) => fnv1(input.toLowerCase(), 64).toString(16).padStart(16, '0')
+
+export type TextMap = Record<string, string>
