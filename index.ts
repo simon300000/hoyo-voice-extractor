@@ -1,7 +1,7 @@
-import { readdir, stat, mkdir, rename } from 'fs/promises'
+import { readdir, stat, mkdir, rename, readFile } from 'fs/promises'
 import { join, extname, dirname } from 'path'
 
-import { fnv1 } from './fnvjs/src/index.js'
+import { fnv1, fnv132 } from './fnvjs/src/index.js'
 
 import { parallelExecute, unpackPCK, convertWEM, unpackBNK } from './tools.js'
 
@@ -35,6 +35,19 @@ export const findFiles = async (folder: string, ext: string) => {
     }
   }
   return [...result, ...(await Promise.all(resultPromise)).flat()]
+}
+
+export const findWAV = async (path: string) => findFiles(path, '.wav')
+export const findJSON = async (path: string) => findFiles(path, '.json')
+
+export const readJSON = async <T>(path: string) => JSON.parse(await readFile(path, 'utf8')) as T
+export const readJSONs = async <T>(paths: string[]) => {
+  const result = [] as T[]
+  while (paths.length) {
+    const batch = paths.splice(0, 256)
+    result.push(...await Promise.all(batch.map(readJSON<T>)))
+  }
+  return result
 }
 
 export const createFolders = async (files: string[], existing = new Set<string>()) => {
