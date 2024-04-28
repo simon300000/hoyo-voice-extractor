@@ -47,4 +47,4 @@ export const unpackPCK = async (pck: string, output: string) => execute(QUICKBMS
 
 export const convertWEM = async (wem: string, wav: string) => execute(VGMSTREAM_CLI, ['-o', wav, wem])
 
-export const unpackBNK = async (bnk: string, output: string) => execute(BNKEXTR, [bnk], output)
+export const unpackBNK = async (bnk: string) => execute(BNKEXTR, [bnk])

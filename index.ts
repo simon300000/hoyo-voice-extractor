@@ -1,4 +1,4 @@
-import { readdir, stat, mkdir, rename, readFile, writeFile } from 'fs/promises'
+import { readdir, stat, mkdir, readFile, writeFile } from 'fs/promises'
 import { join, extname, dirname } from 'path'
 
 import { fnv1 } from './fnvjs/src/index.js'
@@ -89,23 +89,16 @@ export const unpackPCKs = async (source: string, wemFolder: string, wavFolder: s
   await convertWEMs(wems, wemFolder, wavFolder)
 }
 
-export const unpackBNKs = async (source: string, wemFolder: string, wavFolder: string) => {
-  await mkdir(wemFolder, { recursive: true })
-  await mkdir(wavFolder, { recursive: true })
+export const unpackBNKs = async (source: string, wavFolder: string) => {
   const bnks = await findFiles(source, '.bnk')
   console.log(`Found ${bnks.length} bnk files.`)
   console.log('Unpacking...')
-  await Promise.all(bnks.map(bnk => bnk.replace(source, wemFolder)).map(folder => mkdir(folder, { recursive: true })))
-  await parallelExecute(bnks.map(bnk => async () => unpackBNK(bnk, bnk.replace(source, wemFolder))))
+  await parallelExecute(bnks.map(bnk => async () => unpackBNK(bnk)))
 
-  console.log('Renaming wavs to wems...')
-  const wavsWems = await findFiles(wemFolder, '.wav')
-  await Promise.all(wavsWems.map(wavWem => rename(wavWem, wavWem.replace('.wav', '.wem'))))
-
-  const wems = await findFiles(wemFolder, '.wem')
+  const wems = await findFiles(source, '.wem')
   console.log(`Found ${wems.length} wem files.`)
   console.log('Converting...')
-  await convertWEMs(wems, wemFolder, wavFolder)
+  await convertWEMs(wems, source, wavFolder)
 }
 
 export const encodeFNV64 = (input: string) => fnv1(input.toLowerCase(), 64).toString(16).padStart(16, '0')
