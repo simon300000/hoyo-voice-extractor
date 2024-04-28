@@ -126,16 +126,18 @@ export const updateStats = async <Voice extends VoiceBase>(voiceMap: Record<stri
     }
   }
 
+  const vavCount = Object.keys(voiceMap).length
+
   const stats = `<!-- STATS -->
 Last update at \`${currentDate}\`
 
-\`${Object.keys(voiceMap).length}\` wavs
+\`${vavCount}\` wavs
 
-\`${noSpeaker}\` without speaker
+\`${noSpeaker}\` without speaker (${Math.round(noSpeaker / vavCount * 100)}%)
 
-\`${noText}\` without transcription
+\`${noText}\` without transcription (${Math.round(noText / vavCount * 100)}%)
 
-\`${noFileName}\` without inGameFilename
+\`${noFileName}\` without inGameFilename (${Math.round(noFileName / vavCount * 100)}%)
 <!-- STATS_END -->`
 
   console.log(stats)
