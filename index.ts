@@ -37,6 +37,12 @@ export const findWAV = async (path: string) => findFiles(path, '.wav')
 export const findJSON = async (path: string) => findFiles(path, '.json')
 
 export const readJSON = async <T>(path: string) => JSON.parse(await readFile(path, 'utf8')) as T
+
+export const readJSONWithStringHashes = async <T>(path: string) => {
+  const json = await readFile(path, 'utf8')
+  return JSON.parse(json.replace(/("Hash"\s*:\s*)(-?\d+)/g, '$1"$2"')) as T
+}
+
 export const readJSONs = async <T>(paths: string[]) => {
   const result = [] as T[]
   while (paths.length) {
