@@ -105,5 +105,15 @@
     /* Completeness */
     // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
     "skipLibCheck": true                                 /* Skip type checking all .d.ts files. */
-  }
+  },
+  "include": [
+    "index.ts",
+    "tools.ts",
+    "fnvjs/src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "quickpck/build",
+    "wwise/build"
+  ]
 }

@@ -3,19 +3,15 @@ import { join, extname, dirname } from 'path'
 
 import { fnv1 } from './fnvjs/src/index.js'
 
-import { parallelExecute, unpackPCK, convertWEM, unpackBNK } from './tools.js'
-
-const random = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+import { unpackPCK, convertWwise } from './tools.js'
 
 export const checkResultFolder = async (folder: string) => {
+  await mkdir(folder, { recursive: true })
   const files = await readdir(folder)
-  const no = ['wav', 'wem']
-  const badFiles = no.filter(f => files.includes(f))
+  const generatedFolders = ['wav', 'wem', 'wav-pass1', 'wav-pass2', 'wem-pass1', 'wem-bnk-pass2']
+  const badFiles = generatedFolders.filter(f => files.includes(f))
   if (badFiles.length) {
-    console.log('Result folder already exists.')
-    console.log(`Please remove the following files/folders from ${folder}:`)
-    console.log(badFiles.join('\n'))
-    process.exit(1)
+    throw new Error(`Result folder already exists. Remove the following paths from ${folder}:\n${badFiles.join('\n')}`)
   }
 }
 
@@ -61,50 +57,33 @@ export const createFolders = async (files: string[], existing = new Set<string>(
   }
 }
 
-const convertWEMs = async (wems: string[], wemFolder: string, wavFolder: string) => {
-  await createFolders(wems.map(wem => wem.replace(wemFolder, wavFolder)))
-  await parallelExecute(wems.map(wem => async () => {
-    const wavPath = wem.replace(wemFolder, wavFolder).replace('.wem', '.wav')
-    await convertWEM(wem, wavPath)
-  }), 1)
-}
-
 export const unpackPCKs = async (source: string, wemFolder: string, wavFolder: string) => {
   await mkdir(wemFolder, { recursive: true })
   await mkdir(wavFolder, { recursive: true })
-  const pcks = await findFiles(source, '.pck')
-  console.log(`Found ${pcks.length} pck files.`)
-  console.log('Unpacking...')
-  await parallelExecute(pcks.map(pck => async () => {
-    const name = random()
-    const wem = join(wemFolder, name)
-    const wav = join(wavFolder, name)
-    await mkdir(wem)
-    await mkdir(wav)
-    await unpackPCK(pck, wem)
-  }))
+  console.log('Extracting PCK archives...')
+  await unpackPCK(source, wemFolder)
   const wems = await findFiles(wemFolder, '.wem')
-  console.log(`Found ${wems.length} wem files.`)
-  console.log('Converting...')
-  await convertWEMs(wems, wemFolder, wavFolder)
+  const bnks = await findFiles(wemFolder, '.bnk')
+  console.log(`Found ${wems.length} wem and ${bnks.length} bnk files.`)
+  console.log('Converting Wwise audio...')
+  await convertWwise(wemFolder, wavFolder)
 }
 
 export const unpackBNKs = async (source: string, wavFolder: string) => {
   const bnks = await findFiles(source, '.bnk')
   console.log(`Found ${bnks.length} bnk files.`)
-  console.log('Unpacking...')
-  await parallelExecute(bnks.map(bnk => async () => unpackBNK(bnk)))
-
-  const wems = await findFiles(source, '.wem')
-  console.log(`Found ${wems.length} wem files.`)
-  console.log('Converting...')
-  await convertWEMs(wems, source, wavFolder)
+  console.log('Converting Wwise audio...')
+  await convertWwise(source, wavFolder)
 }
 
 export const encodeFNV64 = (input: string) => fnv1(input.toLowerCase(), 64).toString(16).padStart(16, '0')
 
-export const readTextMap = async <TextMapMap extends Record<string, string>>(dataPath: string, textMapMap: TextMapMap) => {
-  return Object.fromEntries(await Promise.all(Object.entries(textMapMap).map(async ([language, filename]) => [language, await readJSON(join(dataPath, 'TextMap', filename))]))) as Record<keyof TextMapMap, TextMap>
+export const readTextMap = async <TextMapMap extends Record<string, string | readonly string[]>>(dataPath: string, textMapMap: TextMapMap) => {
+  return Object.fromEntries(await Promise.all(Object.entries(textMapMap).map(async ([language, value]) => {
+    const filenames = Array.isArray(value) ? value : [value]
+    const maps = await Promise.all(filenames.map(filename => readJSON<TextMap>(join(dataPath, 'TextMap', filename))))
+    return [language, Object.assign({}, ...maps)]
+  }))) as Record<keyof TextMapMap, TextMap>
 }
 
 export const updateStats = async <Voice extends VoiceBase>(voiceMap: Record<string, Voice>, readme: string) => {
@@ -126,25 +105,26 @@ export const updateStats = async <Voice extends VoiceBase>(voiceMap: Record<stri
     }
   }
 
-  const vavCount = Object.keys(voiceMap).length
+  const wavCount = Object.keys(voiceMap).length
+  const percentage = (count: number) => wavCount === 0 ? 0 : Math.round(count / wavCount * 100)
 
   const stats = `<!-- STATS -->
 Last update at \`${currentDate}\`
 
-\`${vavCount}\` wavs
+\`${wavCount}\` wavs
 
-\`${noSpeaker}\` without speaker (${Math.round(noSpeaker / vavCount * 100)}%)
+\`${noSpeaker}\` without speaker (${percentage(noSpeaker)}%)
 
-\`${noText}\` without transcription (${Math.round(noText / vavCount * 100)}%)
+\`${noText}\` without transcription (${percentage(noText)}%)
 
-\`${noFileName}\` without inGameFilename (${Math.round(noFileName / vavCount * 100)}%)
+\`${noFileName}\` without inGameFilename (${percentage(noFileName)}%)
 <!-- STATS_END -->`
 
   console.log(stats)
 
   const originalReadme = await readFile(readme, 'utf-8')
   const updatedReadme = originalReadme.replace(/<!-- STATS -->[\s\S]*<!-- STATS_END -->/, stats)
-  await writeFile('readme.md', updatedReadme)
+  await writeFile(readme, updatedReadme)
 }
 
 export const copyReadme = async (source: string, destination: string, huggingfaceMetadata: string) => {

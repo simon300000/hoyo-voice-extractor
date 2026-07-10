@@ -1,26 +1,54 @@
+import { existsSync } from 'fs'
 import { cpus } from 'os'
-import { join, dirname } from 'path'
+import { join } from 'path'
 import { spawn } from 'child_process'
 
-const UNPACKER_PATH = join(import.meta.dirname, 'Wwise-Unpacker')
-const TOOLS_PATH = join(UNPACKER_PATH, 'Tools')
-const QUICKBMS = join(TOOLS_PATH, 'quickbms.exe')
-const WWISE_PCK_EXTRACTOR = join(TOOLS_PATH, 'wwise_pck_extractor.bms')
-const VGMSTREAM_CLI = join(TOOLS_PATH, 'vgmstream-cli.exe')
-const BNKEXTR = join(TOOLS_PATH, 'bnkextr.exe')
+const executableName = (name: string) => process.platform === 'win32' ? `${name}.exe` : name
+
+const findTool = (environmentVariable: string, folder: string, name: string) => {
+  const override = process.env[environmentVariable]
+  if (override) {
+    return override
+  }
+
+  const executable = executableName(name)
+  const candidates = process.platform === 'win32'
+    ? [
+        join(import.meta.dirname, folder, 'build', 'Release', executable),
+        join(import.meta.dirname, folder, 'build', executable)
+      ]
+    : [join(import.meta.dirname, folder, 'build', executable)]
+
+  const tool = candidates.find(existsSync)
+  if (!tool) {
+    throw new Error(
+      `${name} is not built. Run ${join(import.meta.dirname, folder, process.platform === 'win32' ? 'build.ps1' : 'build.sh')}`
+    )
+  }
+  return tool
+}
 
 export const parallelExecute = async (tasks: (() => Promise<void>)[], multiplier = 2) => {
-  const cpusCount = cpus().length * multiplier
+  if (tasks.length === 0) {
+    return
+  }
+
+  const workerCount = Math.min(tasks.length, cpus().length * multiplier)
   const workers = [] as Promise<void>[]
+  let nextTask = 0
   let taskDone = 0
-  const taskDiv10 = Math.floor(tasks.length / 10)
-  for (let i = 0; i < cpusCount; i++) {
+  let nextProgress = 10
+
+  for (let i = 0; i < workerCount; i++) {
     workers.push((async () => {
-      while (tasks.length) {
-        await tasks.shift()?.()
+      while (nextTask < tasks.length) {
+        const task = tasks[nextTask++]
+        await task()
         taskDone++
-        if (taskDone % taskDiv10 === 0) {
-          console.log(`${Math.floor(taskDone / taskDiv10) * 10}%`)
+        const progress = Math.floor(taskDone / tasks.length * 100)
+        if (progress >= nextProgress || taskDone === tasks.length) {
+          console.log(`${progress}%`)
+          nextProgress += 10
         }
       }
     })())
@@ -28,13 +56,33 @@ export const parallelExecute = async (tasks: (() => Promise<void>)[], multiplier
   await Promise.all(workers)
 }
 
-const execute = (command: string, args: string[], cwd?: string) => new Promise<void>((resolve, reject) => {
-  const process = spawn(command, args, { cwd })
+const execute = (command: string, args: string[]) => new Promise<void>((resolve, reject) => {
+  const child = spawn(command, args)
   let stdout = ''
   let stderr = ''
-  process.stdout.on('data', data => stdout += data)
-  process.stderr.on('data', data => stderr += data)
-  process.on('close', code => {
+  let settled = false
+
+  child.stdout.on('data', data => {
+    const text = data.toString()
+    stdout += text
+    process.stdout.write(text)
+  })
+  child.stderr.on('data', data => {
+    const text = data.toString()
+    stderr += text
+    process.stderr.write(text)
+  })
+  child.on('error', error => {
+    if (!settled) {
+      settled = true
+      reject(error)
+    }
+  })
+  child.on('close', code => {
+    if (settled) {
+      return
+    }
+    settled = true
     if (code === 0) {
       resolve()
     } else {
@@ -43,8 +91,13 @@ const execute = (command: string, args: string[], cwd?: string) => new Promise<v
   })
 })
 
-export const unpackPCK = async (pck: string, output: string) => execute(QUICKBMS, ['-q', '-k', WWISE_PCK_EXTRACTOR, pck, output])
+export const unpackPCK = async (source: string, output: string) => {
+  const tool = findTool('HOYO_PCK_EXTRACT', 'quickpck', 'hoyo-pck-extract')
+  await execute(tool, [source, output])
+}
 
-export const convertWEM = async (wem: string, wav: string) => execute(VGMSTREAM_CLI, ['-o', wav, wem])
+export const convertWwise = async (source: string, output: string) => {
+  const tool = findTool('HOYO_AUDIO_CONVERT', 'wwise', 'hoyo-audio-convert')
+  await execute(tool, [source, output])
+}
 
-export const unpackBNK = async (bnk: string) => execute(BNKEXTR, [bnk])
