@@ -400,12 +400,13 @@ int main(int argc, char** argv) {
     const auto inputRoot = fs::is_regular_file(input) ? input.parent_path() : input;
     const auto files = find_pcks(input);
 
-    std::cout << "Found " << files.size() << " pck files\n";
+    std::cout << "Found " << files.size() << " pck files\n" << std::flush;
     fs::create_directories(output);
 
     std::atomic<std::size_t> next{ 0 };
     std::atomic<std::size_t> done{ 0 };
     std::mutex errorsMutex;
+    std::mutex progressMutex;
     std::vector<std::string> errors;
     std::vector<std::thread> workers;
     const auto progressStep = std::max<std::size_t>(1, files.size() / 100);
@@ -426,7 +427,8 @@ int main(int argc, char** argv) {
           }
           const auto current = done.fetch_add(1) + 1;
           if (current == files.size() || current % progressStep == 0) {
-            std::cout << "Processed " << current << "/" << files.size() << "\n";
+            std::lock_guard<std::mutex> lock(progressMutex);
+            std::cout << "Processed " << current << "/" << files.size() << "\n" << std::flush;
           }
         }
       });
