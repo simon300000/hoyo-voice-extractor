@@ -69,12 +69,17 @@ std::vector<BnkEntry> read_bnk_entries(const fs::path& bnk, std::uint64_t& dataO
   while (read_value(file, section)) {
     const auto sectionPayload = static_cast<std::uint64_t>(file.tellg());
     if (section_is(section, "DIDX")) {
+      if (section.size % sizeof(Index) != 0) {
+        throw std::runtime_error("malformed DIDX section: " + bnk.string());
+      }
       for (std::uint32_t offset = 0; offset < section.size; offset += sizeof(Index)) {
         Index index{};
         if (!read_value(file, index)) {
           throw std::runtime_error("truncated DIDX section: " + bnk.string());
         }
-        entries.push_back(BnkEntry{ index.id, index.offset, index.size });
+        if (index.size != 0) {
+          entries.push_back(BnkEntry{ index.id, index.offset, index.size });
+        }
       }
     } else if (section_is(section, "DATA")) {
       dataOffset = static_cast<std::uint64_t>(file.tellg());
@@ -258,13 +263,14 @@ int main(int argc, char** argv) {
     const auto files = find_inputs(input);
     const auto tempRoot = output / ".hoyo-audio-convert-tmp";
 
-    std::cout << "Found " << files.size() << " bnk/wem files\n";
+    std::cout << "Found " << files.size() << " bnk/wem files\n" << std::flush;
     fs::create_directories(output);
     fs::create_directories(tempRoot);
 
     std::atomic<std::size_t> next{ 0 };
     std::atomic<std::size_t> done{ 0 };
     std::mutex errorsMutex;
+    std::mutex progressMutex;
     std::vector<std::string> errors;
     std::vector<std::thread> workers;
     const auto progressStep = std::max<std::size_t>(1, files.size() / 100);
@@ -290,7 +296,8 @@ int main(int argc, char** argv) {
           }
           const auto current = done.fetch_add(1) + 1;
           if (current == files.size() || current % progressStep == 0) {
-            std::cout << "Processed " << current << "/" << files.size() << "\n";
+            std::lock_guard<std::mutex> lock(progressMutex);
+            std::cout << "Processed " << current << "/" << files.size() << "\n" << std::flush;
           }
         }
       });
