@@ -159,9 +159,9 @@ if(NOT WIN32)
 endif()
 
 if(MSVC)
-  target_compile_options(hoyo-audio-convert PRIVATE /W4)
+  target_compile_options(hoyo-audio-convert PRIVATE /W4 /O2)
 else()
-  target_compile_options(hoyo-audio-convert PRIVATE -Wall -Wextra -Wpedantic)
+  target_compile_options(hoyo-audio-convert PRIVATE -Wall -Wextra -Wpedantic -O3)
 endif()
 
 install(TARGETS hoyo-audio-convert RUNTIME DESTINATION bin)
